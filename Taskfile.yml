@@ -1,0 +1,40 @@
+version: '3'
+
+tasks:
+  client-deploy:
+    cmds:
+      - GOOS=js GOARCH=wasm go build -o  ./wasmclient/html/bookinfo.wasm ./wasmclient/
+      - docker run --rm --name bookinfo-client -v `pwd`/wasmclient/html:/usr/share/nginx/html:ro -p 5800:80 -d nginx
+  client-stop:
+    cmds:
+      - docker container stop bookinfo-client
+  client-build:
+    cmds:
+      - GOOS=js GOARCH=wasm go build -o  ./wasmclient/html/bookinfo.wasm ./wasmclient/
+    silent: true
+  client-restart:
+    cmds:
+      - task: client-stop
+      - task: client-deploy
+    silent: true
+  server-deploy-simple:
+    cmds:
+      - docker compose -f docker-compose-dev.yaml -p bookinfo up -d --build --remove-orphans
+    silent: true
+  server-deploy-whole:
+    cmds:
+      - docker compose -f docker-compose.yaml -p bookinfo up -d --build --remove-orphans
+    silent: true
+  server-stop-simple:
+    cmds:
+      - docker compose -f docker-compose-dev.yaml -p bookinfo down
+    silent: true
+  server-stop-whole:
+    cmds:
+      - docker compose -f docker-compose.yaml -p bookinfo down
+    silent: true
+  server-restart:
+    cmds:
+      - task: server-stop-simple
+      - task: server-deploy-simple
+    silent: true
