@@ -1,10 +1,9 @@
 // Package tracing provides a tracing utility for the application
-package tracing
+package telemetry
 
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel"
@@ -12,43 +11,12 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // InitProvider initializes an OTLP exporter, and configures the corresponding trace and
 // metric providers.
-func InitProvider(endpoint string) (func(context.Context) error, error) {
-	ctx := context.Background()
-
-	res, err := resource.New(ctx,
-		resource.WithAttributes(
-			// the service name used to display traces in backends
-			semconv.ServiceName("bookstore"),
-		),
-	)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to create resource")
-		return nil, fmt.Errorf("failed to create resource: %w", err)
-	}
-
-	// If the OpenTelemetry Collector is running on a local cluster (minikube or
-	// microk8s), it should be accessible through the NodePort service at the
-	// `localhost:30080` endpoint. Otherwise, replace `localhost` with the
-	// endpoint of your cluster. If you run the app inside k8s, then you can
-	// probably connect directly to the service through dns.
-	ctx, cancel := context.WithTimeout(ctx, 30 * time.Second)
-	defer cancel()
-	conn, err := grpc.DialContext(ctx, endpoint,
-		// Note the use of insecure transport here. TLS is recommended in production.
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
-	)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to create gRPC connection to collector")
-		return nil, fmt.Errorf("failed to create gRPC connection to collector: %w", err)
-	}
+func initTracerProvider(ctx context.Context, conn *grpc.ClientConn, res *resource.Resource) (func(context.Context) error, error) {
 
 	// Set up a trace exporter
 	traceExporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithGRPCConn(conn))

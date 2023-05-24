@@ -1,7 +1,7 @@
 package dao
 
 import (
-	"time"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // BookInfoDAO represents the struct of document type to be stored in mongoDB
@@ -15,7 +15,7 @@ type BookInfoDAO struct {
 	// Price is the price of the book.
 	Price       float64 `bson:"price"`
 	// PublishDate is the date when the book was published.
-	PublishDate time.Time `bson:"publishDate"`
+	PublishDate primitive.DateTime `bson:"publishDate"`
 }
 
 

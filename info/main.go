@@ -8,7 +8,7 @@ import (
 
 	rest "github.com/serdarkalayci/bookstore/info/adapters/comm/rest"
 	"github.com/serdarkalayci/bookstore/info/adapters/data/mongodb"
-	"github.com/serdarkalayci/bookstore/info/adapters/tracing"
+	"github.com/serdarkalayci/bookstore/info/adapters/telemetry"
 
 	"github.com/nicholasjackson/env"
 	"github.com/rs/zerolog"
@@ -21,6 +21,7 @@ var bindAddress = env.String("BASE_URL", false, ":5500", "Bind address for rest 
 var otlpEndpoint = env.String("OTLP_ENDPOINT", false, "localhost:4317", "OpenTelemetry Collector endpoint")
 
 func main() {
+	ctx := context.Background()
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	util.SetConstValues()
 	util.SetLogLevels()
@@ -33,7 +34,7 @@ func main() {
 	}
 	//s := rest.NewAPIContext(dbContext, bindAddress)
 	s := rest.NewAPIContext(bindAddress, dbContext.HealthRepository, dbContext.BookInfoRepository)
-	tpShutdown, err := tracing.InitProvider(*otlpEndpoint)	
+	tpShutdown, err := telemetry.InitOTEL(ctx, *otlpEndpoint)	
 	if err != nil {
 		log.Error().Msgf("error received from tracing provider. no tracing will be available.")
 	}

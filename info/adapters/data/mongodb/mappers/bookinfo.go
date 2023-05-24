@@ -4,6 +4,7 @@ package mappers
 import (
 	"github.com/serdarkalayci/bookstore/info/adapters/data/mongodb/dao"
 	"github.com/serdarkalayci/bookstore/info/domain"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // MapBookInfoDAO2BookInfo maps dao bookInfo to domain bookInfo
@@ -13,7 +14,7 @@ func MapBookInfoDAO2BookInfo(pd dao.BookInfoDAO) domain.BookInfo {
 		Title:        pd.Title,
 		Author: 	pd.Author,
 		Price:       pd.Price,
-		PublishDate: pd.PublishDate,
+		PublishDate: pd.PublishDate.Time(),
 	}
 }
 
@@ -33,7 +34,7 @@ func MapBookInfo2BookInfoDAO(p domain.BookInfo) dao.BookInfoDAO {
 		Title:        p.Title,
 		Author: 	p.Author,
 		Price:       p.Price,
-		PublishDate: p.PublishDate,
+		PublishDate: primitive.NewDateTimeFromTime(p.PublishDate),
 	}
 }
 

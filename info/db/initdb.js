@@ -8,7 +8,7 @@ db.books.insertMany([
     "title": "Pride and Prejudice",
     "author": "Jane Austen",
     "price": 9.99,
-    "publishDate": "1813-01-28"
+    "publishDate": new Date("1813-01-28")
   },
   {
     "isbn": "9780061120084",

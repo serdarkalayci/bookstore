@@ -17,7 +17,9 @@ exporters:
       insecure_skip_verify: true
     #   cert_file: cert.pem
     #   key_file: cert-key.pem
-
+  prometheus:
+    endpoint: 0.0.0.0:8889
+  logging:
 extensions:
   health_check:
   pprof:
@@ -30,10 +32,10 @@ service:
       receivers: [otlp]
       processors: [batch]
       exporters: [jaeger]
-    # metrics:
-    #   receivers: [otlp]
-    #   processors: [batch]
-    #   exporters: [otlp]
+    metrics:
+      receivers: [otlp]
+      processors: []
+      exporters: [prometheus, logging]
     # logs:
     #   receivers: [otlp]
     #   processors: [batch]

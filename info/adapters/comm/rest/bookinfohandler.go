@@ -10,6 +10,9 @@ import (
 	"github.com/serdarkalayci/bookstore/info/adapters/comm/rest/mappers"
 	"github.com/serdarkalayci/bookstore/info/adapters/comm/rest/middleware"
 	"github.com/serdarkalayci/bookstore/info/application"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 )
 
 type validatedbookInfo struct{}
@@ -22,12 +25,21 @@ type validatedbookInfo struct{}
 
 // GetBooks gets the tree of all the bookInfos inside a space.
 func (apiContext *APIContext) GetBooks(rw http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
+	duration, _ := otel.Meter("GetBooks").Int64Histogram("work_duration")
+	counter, _ := otel.Meter("GetBooks").Int64Counter("request_counter")
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 	ctx, span := createSpan(ctx, "Rest:BookInfoHandler:GetBooks", r)
 	defer span.End()
 	BookInfoService := application.NewBookInfoService(apiContext.bookInfoRepo)
 	folder, err := BookInfoService.List(ctx)
+	opts := metric.WithAttributes(
+		attribute.Key("Service").String("BookInfo"),
+		attribute.Key("Method").String("GetBooks"),
+	)
+	duration.Record(ctx, time.Since(startTime).Milliseconds(), opts)
+	counter.Add(ctx, 1, opts)
 	if err != nil {
 		respondWithError(rw, r, 500, "Cannot get books from database")
 	} else {
@@ -44,9 +56,13 @@ func (apiContext *APIContext) GetBooks(rw http.ResponseWriter, r *http.Request) 
 
 // GetBookInfo gets the bookInfos of the Titanic with the given id
 func (apiContext *APIContext) GetBookInfo(rw http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
+	duration, _ := otel.Meter("GetBook").Int64Histogram("work_duration")
+	counter, _ := otel.Meter("GetBook").Int64Counter("request_counter")
+
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	ctx, span := createSpan(ctx, "docman.GetOne", r)
+	ctx, span := createSpan(ctx, "Rest:BookInfoHandler:GetBook", r)
 	defer span.End()
 
 	// parse the bookInfo id from the url
@@ -54,6 +70,12 @@ func (apiContext *APIContext) GetBookInfo(rw http.ResponseWriter, r *http.Reques
 	id := vars["id"]
 	BookInfoService := application.NewBookInfoService(apiContext.bookInfoRepo)
 	bookInfo, err := BookInfoService.Get(ctx, id)
+	opts := metric.WithAttributes(
+		attribute.Key("Service").String("BookInfo"),
+		attribute.Key("Method").String("GetBook"),
+	)
+	duration.Record(ctx, time.Since(startTime).Milliseconds(), opts)
+	counter.Add(ctx, 1, opts)
 	if err != nil {
 		switch err.(type) {
 		case *application.ErrorCannotFindBook:
