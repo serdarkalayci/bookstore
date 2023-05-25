@@ -79,6 +79,30 @@ services:
       - bookinfo-mongodata:/data/db
     networks:
       - bookstore-network
+  bookstockapi:
+    build: ./stock/.
+    container_name: bookstockAPI
+    ports:
+      - "5551:5551"
+    environment: 
+      BASE_URL : ":5551"
+      OTLP_ENDPOINT: "otel-collector:4317"
+      ConnectionString: "bookstockredis:6379"
+    networks:
+      - bookstore-network
+    depends_on:
+      - bookstockredis
+      - otel-collector
+  bookstockredis:
+    build: ./stock/db/.
+    container_name: bookstock-redis
+    restart: always
+    ports:
+      - 6379:6379
+    environment:
+      ALLOW_EMPTY_PASSWORD: yes
+    networks:
+      - bookstore-network      
 networks:
   bookstore-network:    
 volumes:
