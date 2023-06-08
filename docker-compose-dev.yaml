@@ -56,6 +56,7 @@ services:
     environment: 
       BASE_URL : ":5550"
       OTLP_ENDPOINT: "otel-collector:4317"
+      STOCK_URL: "bookstockapi:5551"
       ConnectionString: "mongodb://{username}:{password}@bookinfomongo:27017"
       DatabaseName: bookinfo
       DbUserName: mongoadmin
