@@ -14,6 +14,8 @@ type BookInfoResponseDTO struct {
 	Price       float64 `json:"price"`
 	// PublishDate is the date when the book was published.
 	PublishDate time.Time `json:"publishdate"`
+	// Stock is the stock of the book.
+	Stock       int `json:"stock"`
 }
 
 // BookInfoListDTO represents the struct of document type which is stripped down a few fields 

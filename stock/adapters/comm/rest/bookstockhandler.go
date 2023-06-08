@@ -29,8 +29,8 @@ func (apiContext *APIContext) GetBookStock(rw http.ResponseWriter, r *http.Reque
 	startTime := time.Now()
 	duration, _ := otel.Meter("GetBook").Int64Histogram("work_duration")
 	counter, _ := otel.Meter("GetBook").Int64Counter("request_counter")
-
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	middleware.Extract(ctx, r)
 	defer cancel()
 	ctx, span := createSpan(ctx, "Rest:BookStockHandler:GetBook", r)
 	defer span.End()

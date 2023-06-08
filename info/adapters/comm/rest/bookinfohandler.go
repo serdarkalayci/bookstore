@@ -2,7 +2,10 @@ package rest
 
 import (
 	"context"
+	"encoding/json"
+	"io/ioutil"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -10,6 +13,7 @@ import (
 	"github.com/serdarkalayci/bookstore/info/adapters/comm/rest/mappers"
 	"github.com/serdarkalayci/bookstore/info/adapters/comm/rest/middleware"
 	"github.com/serdarkalayci/bookstore/info/application"
+	stockdto "github.com/serdarkalayci/bookstore/stock/adapters/comm/rest/dto"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -74,6 +78,8 @@ func (apiContext *APIContext) GetBookInfo(rw http.ResponseWriter, r *http.Reques
 		attribute.Key("Service").String("BookInfo"),
 		attribute.Key("Method").String("GetBook"),
 	)
+	pDTO := mappers.MapBookInfo2BookInfoResponseDTO(bookInfo)
+	stockDTO, _ := callStockService(ctx, id)
 	duration.Record(ctx, time.Since(startTime).Milliseconds(), opts)
 	counter.Add(ctx, 1, opts)
 	if err != nil {
@@ -84,7 +90,8 @@ func (apiContext *APIContext) GetBookInfo(rw http.ResponseWriter, r *http.Reques
 			respondWithError(rw, r, 500, "Internal server error")
 		}
 	} else {
-		pDTO := mappers.MapBookInfo2BookInfoResponseDTO(bookInfo)
+
+		pDTO.Stock = stockDTO.Stock
 		respondWithJSON(rw, r, 200, pDTO)
 	}
 }
@@ -117,3 +124,30 @@ func (apiContext *APIContext) MiddlewareValidateNewBookInfo(next http.Handler) h
 		next.ServeHTTP(rw, r)
 	})
 }
+
+func callStockService(ctx context.Context, id string) (stockdto.BookStockResponseDTO, error) {
+		// Call stocks service
+		url := os.Getenv("STOCK_URL")
+		if url == "" {
+			url = "http://localhost:5551"
+		}
+	
+		url = url + "/book/" + id
+		// First prepare the tracing info
+		netClient := &http.Client{Timeout: time.Second * 10}
+		req, _ := http.NewRequest("GET", url, nil)
+		middleware.Inject(ctx, req)
+		// Inject the client span context into the headers
+		// tracer.Inject(span.Context(), opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(req.Header))
+		stockresponse, err := netClient.Do(req)
+	
+		stockInfo := &stockdto.BookStockResponseDTO{
+			ISBN: id,
+			Stock: 0,
+		}
+		if err == nil {
+			buf, _ := ioutil.ReadAll(stockresponse.Body)
+			json.Unmarshal(buf, &stockInfo)
+		}
+		return *stockInfo, err
+	}
