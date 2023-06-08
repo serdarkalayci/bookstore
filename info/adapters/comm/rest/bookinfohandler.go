@@ -129,7 +129,7 @@ func callStockService(ctx context.Context, id string) (stockdto.BookStockRespons
 		// Call stocks service
 		url := os.Getenv("STOCK_URL")
 		if url == "" {
-			url = "http://localhost:5551"
+			url = "http://localhost:5501"
 		}
 	
 		url = url + "/book/" + id
@@ -140,11 +140,14 @@ func callStockService(ctx context.Context, id string) (stockdto.BookStockRespons
 		// Inject the client span context into the headers
 		// tracer.Inject(span.Context(), opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(req.Header))
 		stockresponse, err := netClient.Do(req)
-	
 		stockInfo := &stockdto.BookStockResponseDTO{
 			ISBN: id,
 			Stock: 0,
 		}
+		if err != nil {
+			log.Error().Err(err).Msg("Error calling stock service")
+		}
+		defer stockresponse.Body.Close()
 		if err == nil {
 			buf, _ := ioutil.ReadAll(stockresponse.Body)
 			json.Unmarshal(buf, &stockInfo)

@@ -17,7 +17,7 @@ import (
 	util "github.com/serdarkalayci/bookstore/stock/util"
 )
 
-var bindAddress = env.String("BASE_URL", false, ":5500", "Bind address for rest server")
+var bindAddress = env.String("BASE_URL", false, ":5501", "Bind address for rest server")
 var otlpEndpoint = env.String("OTLP_ENDPOINT", false, "localhost:4317", "OpenTelemetry Collector endpoint")
 
 func main() {
