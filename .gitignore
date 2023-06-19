@@ -7,6 +7,8 @@
 *.dll
 *.so
 *.dylib
+info/info
+stock/stock
 
 # Test binary, built with `go test -c`
 *.test
@@ -19,6 +21,8 @@
 
 # Go workspace file
 go.work
-info/info
+
+# Local configuration file
 .DS_Store
-stock/stock
+.vscode
+

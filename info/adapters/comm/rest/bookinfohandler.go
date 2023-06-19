@@ -3,6 +3,7 @@ package rest
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -60,6 +61,7 @@ func (apiContext *APIContext) GetBooks(rw http.ResponseWriter, r *http.Request) 
 
 // GetBookInfo gets the bookInfos of the Titanic with the given id
 func (apiContext *APIContext) GetBookInfo(rw http.ResponseWriter, r *http.Request) {
+	fmt.Println("begin " + time.Now().String())
 	startTime := time.Now()
 	duration, _ := otel.Meter("GetBook").Int64Histogram("work_duration")
 	counter, _ := otel.Meter("GetBook").Int64Counter("request_counter")
@@ -72,16 +74,20 @@ func (apiContext *APIContext) GetBookInfo(rw http.ResponseWriter, r *http.Reques
 	// parse the bookInfo id from the url
 	vars := mux.Vars(r)
 	id := vars["id"]
+	// First lets call stock service in parallel
+	sChan := make(chan stockdto.BookStockResponseDTO)
+	eChan := make(chan error)
+	defer close(sChan)
+	defer close(eChan)
+	go callStockService(ctx, id, sChan, eChan)
 	BookInfoService := application.NewBookInfoService(apiContext.bookInfoRepo)
 	bookInfo, err := BookInfoService.Get(ctx, id)
 	opts := metric.WithAttributes(
 		attribute.Key("Service").String("BookInfo"),
 		attribute.Key("Method").String("GetBook"),
 	)
+
 	pDTO := mappers.MapBookInfo2BookInfoResponseDTO(bookInfo)
-	stockDTO, _ := callStockService(ctx, id)
-	duration.Record(ctx, time.Since(startTime).Milliseconds(), opts)
-	counter.Add(ctx, 1, opts)
 	if err != nil {
 		switch err.(type) {
 		case *application.ErrorCannotFindBook:
@@ -89,12 +95,53 @@ func (apiContext *APIContext) GetBookInfo(rw http.ResponseWriter, r *http.Reques
 		default:
 			respondWithError(rw, r, 500, "Internal server error")
 		}
-	} else {
-
-		pDTO.Stock = stockDTO.Stock
-		respondWithJSON(rw, r, 200, pDTO)
 	}
+	select {
+	case stockDTO := <-sChan:
+		pDTO.Stock = stockDTO.Stock
+	case <-eChan:
+	}
+	duration.Record(ctx, time.Since(startTime).Milliseconds(), opts)
+	counter.Add(ctx, 1, opts)
+	fmt.Println("end " + time.Now().String())
+	respondWithJSON(rw, r, 200, pDTO)
+	
 }
+
+func callStockService(ctx context.Context, id string, sChan chan stockdto.BookStockResponseDTO, eChan chan error) {
+		fmt.Println("stock begin " + time.Now().String())
+		// Call stocks serviceq
+		url := os.Getenv("STOCK_URL")
+		if url == "" {
+			url = "http://localhost:5501"
+		}
+	
+		url = url + "/book/" + id
+		// First prepare the tracing info
+		netClient := &http.Client{Timeout: time.Second * 10}
+		req, _ := http.NewRequest("GET", url, nil)
+		middleware.Inject(ctx, req)
+		// Inject the client span context into the headers
+		// tracer.Inject(span.Context(), opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(req.Header))
+		stockresponse, err := netClient.Do(req)
+		stockInfo := &stockdto.BookStockResponseDTO{
+			ISBN: id,
+			Stock: 0,
+		}
+		if err != nil {
+			log.Error().Err(err).Msg("Error calling stock service")
+			eChan <- err
+		}
+		defer stockresponse.Body.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("Error calling stock service")
+			eChan <- err
+		}
+		buf, _ := ioutil.ReadAll(stockresponse.Body)
+		json.Unmarshal(buf, &stockInfo)
+		fmt.Println("stock end " + time.Now().String())
+		sChan <- *stockInfo
+	}
 
 
 
@@ -124,33 +171,3 @@ func (apiContext *APIContext) MiddlewareValidateNewBookInfo(next http.Handler) h
 		next.ServeHTTP(rw, r)
 	})
 }
-
-func callStockService(ctx context.Context, id string) (stockdto.BookStockResponseDTO, error) {
-		// Call stocks service
-		url := os.Getenv("STOCK_URL")
-		if url == "" {
-			url = "http://localhost:5501"
-		}
-	
-		url = url + "/book/" + id
-		// First prepare the tracing info
-		netClient := &http.Client{Timeout: time.Second * 10}
-		req, _ := http.NewRequest("GET", url, nil)
-		middleware.Inject(ctx, req)
-		// Inject the client span context into the headers
-		// tracer.Inject(span.Context(), opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(req.Header))
-		stockresponse, err := netClient.Do(req)
-		stockInfo := &stockdto.BookStockResponseDTO{
-			ISBN: id,
-			Stock: 0,
-		}
-		if err != nil {
-			log.Error().Err(err).Msg("Error calling stock service")
-		}
-		defer stockresponse.Body.Close()
-		if err == nil {
-			buf, _ := ioutil.ReadAll(stockresponse.Body)
-			json.Unmarshal(buf, &stockInfo)
-		}
-		return *stockInfo, err
-	}
